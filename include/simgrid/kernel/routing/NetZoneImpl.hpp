@@ -262,6 +262,11 @@ public:
   static void get_global_route(const NetPoint* src, const NetPoint* dst,
                                /* OUT */ std::vector<resource::StandardLinkImpl*>& links, double* latency);
 
+#ifdef HIGH_DEPTH_ROUTING_ALGORITHM
+static void get_route_to_ancestor(const NetPoint* src, NetZoneImpl* dst,
+                                        std::vector<kernel::resource::StandardLinkImpl*>& links, double* latency);
+#endif
+
   /** @brief Similar to get_global_route but get the NetZones traversed by route */
   static void get_global_route_with_netzones(const NetPoint* src, const NetPoint* dst,
                                              /* OUT */ std::vector<resource::StandardLinkImpl*>& links, double* latency,
