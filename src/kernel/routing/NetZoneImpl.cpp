@@ -527,7 +527,7 @@ static void find_common_ancestors(const NetPoint* src, const NetPoint* dst,
       *dst_ancestor = *dst_it;
       path_src->erase(path_src->begin(), src_it + 2);
       break;
-    }
+    } 
   }
 
   if (*src_ancestor == *dst_ancestor) { // src is the ancestor of dst, or the contrary
@@ -590,17 +590,13 @@ void NetZoneImpl::get_down_to_up_route(const NetPoint* down, NetPoint* up,
 
   NetPoint* current;
   NetPoint* gateway = up;
-  Route route;
+  Route route       = Route();
 
-  for (auto it = path_src->begin(); (it != path_src->end()); ++it) {
-
+  for (auto it = path_src->begin(); it != path_src->end(); it++) {
     current = (*it)->netpoint_;
-    xbt_enforce(gateway != nullptr, "Gateway is nullptr, please report that bug.");
-
     gateway->get_englobing_zone()->get_local_route(current, gateway, &route, latency);
-
     links.insert(links.begin(), route.link_list_.begin(), route.link_list_.end());
-    gateway = route.gw_dst_;
+    gateway = route.gw_src_;
     route   = Route();
   }
 
@@ -636,9 +632,9 @@ void NetZoneImpl::get_global_route_with_netzones(const NetPoint* src, const NetP
   get_path(src, path_src);
   get_path(dst, path_dst);
 
-  XBT_DEBUG("find_common_ancestors: src '%s' dst '%s'", src->get_cname(), dst->get_cname());
+  XBT_DEBUG("find_common_ancestors: src '%s' dst '%s' :", src->get_cname(), dst->get_cname());
   find_common_ancestors(src, dst, &common_ancestor, &src_ancestor, &dst_ancestor, &path_src, &path_dst);
-  XBT_DEBUG("find_common_ancestors: common ancestor '%s' src ancestor '%s' dst ancestor '%s'",
+  XBT_DEBUG("\tfind_common_ancestors: common ancestor '%s' src ancestor '%s' dst ancestor '%s'",
             common_ancestor->get_cname(), src_ancestor->get_cname(), dst_ancestor->get_cname());
 
   if (common_ancestor->get_bypass_route(src, dst, links, latency, netzones))
@@ -651,54 +647,57 @@ void NetZoneImpl::get_global_route_with_netzones(const NetPoint* src, const NetP
   std::vector<resource::StandardLinkImpl*> src_to_src_ancestor;
   std::vector<resource::StandardLinkImpl*> dst_ancestor_to_dst;
 
+  // usual case
   if (src_ancestor != common_ancestor && dst_ancestor != common_ancestor) {
-    // usual case
+    XBT_DEBUG("src and dst are not in the same zone");
     common_ancestor->get_local_route(src_ancestor->netpoint_, dst_ancestor->netpoint_, &route, latency);
-    if (route.gw_src_ != nullptr)
-      get_down_to_up_route(src, route.gw_src_, src_to_src_ancestor, latency, &path_src);
-    else
-      XBT_WARN("No gw_src found in route, unexpected behaviour may occur");
-
-    if (route.gw_dst_ != nullptr)
-      get_up_to_down_route(dst, route.gw_dst_, dst_ancestor_to_dst, latency, &path_dst);
-    else
-      XBT_WARN("No gw_dst found in route, unexpected behaviour may occur");
-
-    XBT_DEBUG("\t link list from src %s to ancestor %s :", src->get_cname(), src_ancestor->get_cname());
-    for (auto const& link : src_to_src_ancestor) {
-      XBT_DEBUG("\t\t\t link %s", link->get_cname());
-    }
-    XBT_DEBUG("\t link list from ancestor %s to dst %s :", dst_ancestor->get_cname(), dst->get_cname());
-    for (auto const& link : dst_ancestor_to_dst) {
-      XBT_DEBUG("\t\t link %s", link->get_cname());
-    }
+    xbt_assert(route.gw_src_ != nullptr,
+               "No Gateway (gw_src) for zone %s found in route, please check your platform. If this error remains, "
+               "please report it.",
+               src_ancestor->get_cname());
+    xbt_assert(route.gw_dst_ != nullptr,
+               "No Gateway (gw_dst) for zone %s found in route, please check your platform. If this error remains, "
+               "please report it.",
+               dst_ancestor->get_cname());
 
     std::move(begin(route.link_list_), end(route.link_list_), std::back_inserter(links));
-    links.insert(links.end(), begin(dst_ancestor_to_dst), end(dst_ancestor_to_dst));
-    links.insert(links.begin(), begin(src_to_src_ancestor), end(src_to_src_ancestor));
 
-  } // src is in the zone of the dst ancestor
+    get_down_to_up_route(src, route.gw_src_, src_to_src_ancestor, latency, &path_src);
+    get_up_to_down_route(dst, route.gw_dst_, dst_ancestor_to_dst, latency, &path_dst);
+
+    links.insert(links.begin(), begin(src_to_src_ancestor), end(src_to_src_ancestor));
+    links.insert(links.end(), begin(dst_ancestor_to_dst), end(dst_ancestor_to_dst));
+
+  }
+  // src is in the zone of the dst ancestor
   else if (src_ancestor == common_ancestor && dst_ancestor != common_ancestor) {
+    XBT_DEBUG("src is in the zone of the common ancestor but not dst");
     common_ancestor->get_local_route(src, dst_ancestor->netpoint_, &route, latency);
-    std::move(begin(route.link_list_), end(route.link_list_), std::back_inserter(links));
-    if (route.gw_dst_ != nullptr)
-      get_up_to_down_route(dst, route.gw_dst_, dst_ancestor_to_dst, latency, &path_dst);
-    else
-      XBT_WARN("No gw_dst found in route, unexpected behaviour may occur");
-    links.insert(links.end(), begin(dst_ancestor_to_dst), end(dst_ancestor_to_dst));
+    xbt_assert(route.gw_dst_ != nullptr,
+               "No Gateway (gw_dst) for zone %s found in route, please check your platform. If this error remains, "
+               "please report it.",
+               dst_ancestor->get_cname());
 
-  } // dst is in the zone of the src ancestor
-  else if (src_ancestor != common_ancestor && dst_ancestor == common_ancestor) {
-    common_ancestor->get_local_route(src_ancestor->netpoint_, dst, &route, latency);
     std::move(begin(route.link_list_), end(route.link_list_), std::back_inserter(links));
-    if (route.gw_src_ != nullptr)
-      get_down_to_up_route(src, route.gw_src_, src_to_src_ancestor, latency, &path_src);
-    else
-      XBT_WARN("No gw_src found in route, unexpected behaviour may occur");
+    get_up_to_down_route(dst, route.gw_dst_, dst_ancestor_to_dst, latency, &path_dst);
+    links.insert(links.end(), begin(dst_ancestor_to_dst), end(dst_ancestor_to_dst));
+  }
+  // dst is in the zone of the src ancestor
+  else if (src_ancestor != common_ancestor && dst_ancestor == common_ancestor) {
+    XBT_DEBUG("dst is in the zone of the common ancestor but not src");
+    common_ancestor->get_local_route(src_ancestor->netpoint_, dst, &route, latency);
+    xbt_assert(route.gw_src_ != nullptr,
+               "No Gateway (gw_src) for zone %s found in route, please check your platform. If this error remains, "
+               "please report it.",
+               src_ancestor->get_cname());
+    std::move(begin(route.link_list_), end(route.link_list_), std::back_inserter(links));
+    get_down_to_up_route(src, route.gw_src_, src_to_src_ancestor, latency, &path_src);
     links.insert(links.begin(), begin(src_to_src_ancestor), end(src_to_src_ancestor));
 
-  } // should not happen though
+  }
+  // should not happen though
   else {
+    XBT_DEBUG("src and dst are in the zone of the common ancestor");
     common_ancestor->get_local_route(src, dst, &route, latency);
     std::move(begin(route.link_list_), end(route.link_list_), std::back_inserter(links));
     return;
