@@ -504,11 +504,8 @@ static void find_common_ancestors(const NetPoint* src, const NetPoint* dst,
   NetZoneImpl* parent = nullptr; // the netzone we dropped on the previous loop iteration
   for (auto src_it = path_src->begin(), dst_it = path_dst->begin();
        src_it != path_src->end() && dst_it != path_dst->end(); ++src_it, ++dst_it) {
-
-    XBT_DEBUG("src_it: %s, dst_it: %s", (*src_it)->get_cname(), (*dst_it)->get_cname());
     if (*src_it != *dst_it) /* (2) we found the difference at least. Finalize the returned values */
     {
-      XBT_DEBUG("found the difference: src_it: %s, dst_it: %s", (*src_it)->get_cname(), (*dst_it)->get_cname());
       *src_ancestor = *src_it; /* the first different parent of src */
       *dst_ancestor = *dst_it; /* the first different parent of dst */
       path_src->erase(path_src->begin(), src_it + 1);
@@ -563,12 +560,9 @@ void NetZoneImpl::get_up_to_down_route(const NetPoint* down, NetPoint* up,
   Route route;
 
   for (auto it = path_src->begin(); (it != path_src->end()); ++it) {
-
     current = (*it)->netpoint_;
     xbt_enforce(gateway != nullptr, "Gateway is nullptr, please report that bug.");
-
     gateway->get_englobing_zone()->get_local_route(gateway, current, &route, latency);
-
     links.insert(links.end(), route.link_list_.begin(), route.link_list_.end());
     gateway = route.gw_dst_;
     route   = Route();
@@ -649,7 +643,6 @@ void NetZoneImpl::get_global_route_with_netzones(const NetPoint* src, const NetP
 
   // usual case
   if (src_ancestor != common_ancestor && dst_ancestor != common_ancestor) {
-    XBT_DEBUG("src and dst are not in the same zone");
     common_ancestor->get_local_route(src_ancestor->netpoint_, dst_ancestor->netpoint_, &route, latency);
     xbt_assert(route.gw_src_ != nullptr,
                "No Gateway (gw_src) for zone %s found in route, please check your platform. If this error remains, "
@@ -671,7 +664,6 @@ void NetZoneImpl::get_global_route_with_netzones(const NetPoint* src, const NetP
   }
   // src is in the zone of the dst ancestor
   else if (src_ancestor == common_ancestor && dst_ancestor != common_ancestor) {
-    XBT_DEBUG("src is in the zone of the common ancestor but not dst");
     common_ancestor->get_local_route(src, dst_ancestor->netpoint_, &route, latency);
     xbt_assert(route.gw_dst_ != nullptr,
                "No Gateway (gw_dst) for zone %s found in route, please check your platform. If this error remains, "
@@ -684,7 +676,6 @@ void NetZoneImpl::get_global_route_with_netzones(const NetPoint* src, const NetP
   }
   // dst is in the zone of the src ancestor
   else if (src_ancestor != common_ancestor && dst_ancestor == common_ancestor) {
-    XBT_DEBUG("dst is in the zone of the common ancestor but not src");
     common_ancestor->get_local_route(src_ancestor->netpoint_, dst, &route, latency);
     xbt_assert(route.gw_src_ != nullptr,
                "No Gateway (gw_src) for zone %s found in route, please check your platform. If this error remains, "
@@ -697,7 +688,8 @@ void NetZoneImpl::get_global_route_with_netzones(const NetPoint* src, const NetP
   }
   // should not happen though
   else {
-    XBT_DEBUG("src and dst are in the zone of the common ancestor");
+    XBT_WARN("src and dst are in the zone of the common ancestor, this should not happen at this point, but let's "
+             "handle it anyway");
     common_ancestor->get_local_route(src, dst, &route, latency);
     std::move(begin(route.link_list_), end(route.link_list_), std::back_inserter(links));
     return;
