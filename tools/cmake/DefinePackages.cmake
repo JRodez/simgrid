@@ -508,6 +508,8 @@ set(MC_SRC_STATELESS
   src/mc/api/RemoteApp.cpp
   src/mc/api/RemoteApp.hpp
  
+  src/mc/explo/CriticalTransitionExplorer.cpp
+  src/mc/explo/CriticalTransitionExplorer.hpp
   src/mc/explo/DFSExplorer.cpp
   src/mc/explo/DFSExplorer.hpp
   src/mc/explo/Exploration.cpp
@@ -601,6 +603,7 @@ set(MC_SRC_STATELESS
   src/mc/explo/reduction/Reduction.cpp
   src/mc/explo/reduction/Reduction.hpp
   src/mc/explo/reduction/NoReduction.hpp
+  src/mc/explo/reduction/DPOR.cpp
   src/mc/explo/reduction/DPOR.hpp
   src/mc/explo/reduction/SDPOR.hpp
   src/mc/explo/reduction/ODPOR.cpp

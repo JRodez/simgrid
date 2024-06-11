@@ -37,10 +37,12 @@ ExecPtr Exec::init()
 Exec* Exec::do_start()
 {
   kernel::actor::simcall_answered([this] {
-    (*boost::static_pointer_cast<kernel::activity::ExecImpl>(pimpl_))
-        .set_name(get_name())
-        .set_tracing_category(get_tracing_category())
-        .start();
+    auto pimpl = boost::static_pointer_cast<kernel::activity::ExecImpl>(pimpl_);
+    pimpl->set_name(get_name());
+    pimpl->set_tracing_category(get_tracing_category());
+    if (detached_)
+      pimpl->detach();
+    pimpl->start();
   });
 
   if (suspended_)
@@ -71,10 +73,6 @@ ssize_t Exec::deprecated_wait_any_for(const std::vector<ExecPtr>& execs, double 
   return -1;
 }
 
-/** @brief change the execution bound
- * This means changing the maximal amount of flops per second that it may consume, regardless of what the host may
- * deliver. Currently, this cannot be changed once the exec started.
- */
 ExecPtr Exec::set_bound(double bound)
 {
   xbt_assert(state_ == State::INITED || state_ == State::STARTING,
@@ -85,12 +83,6 @@ ExecPtr Exec::set_bound(double bound)
   return this;
 }
 
-/** @brief  Change the execution priority, don't you think?
- *
- * An execution with twice the priority will get twice the amount of flops when the resource is shared.
- * The default priority is 1.
- *
- * Currently, this cannot be changed once the exec started. */
 ExecPtr Exec::set_priority(double priority)
 {
   xbt_assert(state_ == State::INITED || state_ == State::STARTING,
@@ -152,9 +144,6 @@ ExecPtr Exec::set_thread_count(int thread_count)
   return this;
 }
 
-/** @brief Retrieve the host on which this activity takes place.
- *  If it runs on more than one host, only the first host is returned.
- */
 Host* Exec::get_host() const
 {
   return static_cast<kernel::activity::ExecImpl*>(pimpl_.get())->get_host();
@@ -169,9 +158,6 @@ int Exec::get_thread_count() const
   return static_cast<kernel::activity::ExecImpl*>(pimpl_.get())->get_thread_count();
 }
 
-/** @brief Change the host on which this activity takes place.
- *
- * The activity cannot be terminated already (but it may be started). */
 ExecPtr Exec::set_host(Host* host)
 {
   xbt_assert(state_ == State::INITED || state_ == State::STARTING || state_ == State::STARTED,
@@ -238,10 +224,6 @@ double Exec::get_remaining() const
         [this]() { return boost::static_pointer_cast<kernel::activity::ExecImpl>(pimpl_)->get_remaining(); });
 }
 
-/** @brief Returns the ratio of elements that are still to do
- *
- * The returned value is between 0 (completely done) and 1 (nothing done yet).
- */
 double Exec::get_remaining_ratio() const
 {
   if (is_parallel())
